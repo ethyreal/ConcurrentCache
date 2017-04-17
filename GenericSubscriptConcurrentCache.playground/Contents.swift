@@ -21,19 +21,8 @@ class Artist:Hashable {
     }
 }
 
-extension Artist: Cachable {
-    var cacheKey: String {
-        return self.artistID
-    }
-}
 
-protocol Cachable {
-    
-    var cacheKey:String { get }
-}
-
-
-class Cache<T:Cachable> {
+class Cache<T> {
     
     private var items = [String:T]()
     
@@ -53,18 +42,21 @@ class Cache<T:Cachable> {
         self.queue = DispatchQueue(label:queueLabel, attributes:.concurrent)
     }
     
-    func itemByKey(_ cacheKey:String) -> T? {
-        
-        var item:T?
-        
-        self.queue.sync(flags: .barrier) {
-            item = self.items[cacheKey]
+    subscript(key: String) -> T? {
+        get {
+            var item:T?
+            self.queue.sync(flags: .barrier) {
+                item = self.items[key]
+            }
+            return item
         }
-        
-        return item
+        set {
+            self.queue.async(flags: .barrier) {
+                self.items[key] = newValue
+            }
+        }
     }
-    
-    
+
     func allItems() -> [T] {
         
         var items = [T]()
@@ -74,22 +66,6 @@ class Cache<T:Cachable> {
         }
         
         return items
-    }
-    
-    
-    func add(item:T) {
-        
-        self.queue.async(flags: .barrier) {
-            self.items[item.cacheKey] = item
-        }
-    }
-    
-    
-    func remove(_ item:T) {
-        
-        self.queue.async(flags: .barrier) {
-            self.items[item.cacheKey] = nil
-        }
     }
     
     func reset() {
@@ -128,7 +104,7 @@ class ArtistCacheTests: XCTestCase {
         
         let expectedCount = self.cache.count + 1
         
-        self.cache.add(item: prince)
+        self.cache[prince.artistID] = prince
         
         XCTAssertEqual(expectedCount, self.cache.count)
     }
@@ -140,8 +116,8 @@ class ArtistCacheTests: XCTestCase {
         
         let expectedCount = self.cache.count + 1
         
-        self.cache.add(item: prince)
-        self.cache.add(item: bowie)
+        self.cache[prince.artistID] = prince
+        self.cache[prince.artistID] = bowie
         
         XCTAssertEqual(expectedCount, self.cache.count)
     }
@@ -153,9 +129,9 @@ class ArtistCacheTests: XCTestCase {
         
         let expectedCount = self.cache.count + 2
         
-        self.cache.add(item: prince)
-        self.cache.add(item: bowie)
-        
+        self.cache[prince.artistID] = prince
+        self.cache[bowie.artistID] = bowie
+
         XCTAssertEqual(expectedCount, self.cache.count)
     }
     
@@ -164,9 +140,9 @@ class ArtistCacheTests: XCTestCase {
         
         let prince = Artist(id: "1", name: "Prince")
         
-        self.cache.add(item: prince)
+        self.cache[prince.artistID] = prince
         
-        XCTAssertNil(self.cache.itemByKey("2"))
+        XCTAssertNil(self.cache["2"])
     }
     
     
@@ -174,9 +150,9 @@ class ArtistCacheTests: XCTestCase {
         
         let prince = Artist(id: "1", name: "Prince")
         
-        self.cache.add(item: prince)
+        self.cache["1"] = prince
         
-        XCTAssertNotNil(self.cache.itemByKey("1"))
+        XCTAssertNotNil(self.cache["1"])
     }
     
     
@@ -184,9 +160,9 @@ class ArtistCacheTests: XCTestCase {
         
         let prince = Artist(id: "1", name: "Prince")
         
-        self.cache.add(item: prince)
+        self.cache["1"] = prince
         
-        XCTAssertEqual(prince, self.cache.itemByKey("1"))
+        XCTAssertEqual(prince, self.cache["1"])
     }
     
     
@@ -194,10 +170,10 @@ class ArtistCacheTests: XCTestCase {
         
         let prince = Artist(id: "1", name: "Prince")
         
-        self.cache.add(item: prince)
-        self.cache.remove(prince)
+        self.cache["1"] = prince
+        self.cache["1"] = nil
         
-        XCTAssertNil(self.cache.itemByKey("1"))
+        XCTAssertNil(self.cache["1"])
     }
     
     func testRestRemovesAll() {
@@ -205,8 +181,8 @@ class ArtistCacheTests: XCTestCase {
         let prince = Artist(id: "1", name: "Prince")
         let bowie = Artist(id: "2", name: "David Bowie")
         
-        self.cache.add(item: prince)
-        self.cache.add(item: bowie)
+        self.cache["1"] = prince
+        self.cache["2"] = bowie
         
         self.cache.reset()
         
