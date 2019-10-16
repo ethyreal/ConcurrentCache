@@ -2,23 +2,20 @@
 import UIKit
 import XCTest
 
-class Artist:Hashable {
+class Artist: Equatable {
 
-    let artistID:String
-    let name:String
+    let artistID: String
+    let name: String
     
-    init(id artistID:String, name:String) {
+    init(id artistID: String, name: String) {
         self.artistID = artistID
         self.name = name
     }
-    
-    var hashValue: Int {
-        return artistID.hashValue ^ name.hashValue
-    }
-    
+
     static func == (lhs: Artist, rhs: Artist) -> Bool {
         return lhs.artistID == rhs.artistID && lhs.name == rhs.name
     }
+
 }
 
 
@@ -46,7 +43,7 @@ class ArtistCache {
 
         var foundArtist:Artist?
         
-        self.queue.sync(flags: .barrier) {
+        self.queue.sync {
              foundArtist = self.artists[artistID]
         }
         
@@ -58,7 +55,7 @@ class ArtistCache {
         
         var foundArtists = [Artist]()
         
-        self.queue.sync(flags: .barrier) {
+        self.queue.sync {
             foundArtists = self.artists.map { $0.1 }
         }
         
@@ -205,5 +202,4 @@ class ArtistCacheTests: XCTestCase {
 
 }
 
-let tests = ArtistCacheTests.defaultTestSuite()
-tests.run()
+ArtistCacheTests.defaultTestSuite.run()
